@@ -1,5 +1,6 @@
+# TODO: Write a listener that does basically the same thing but with live data (probably Arduino)...
+
 import socket
-import time
 import sys
 
 def print_progress(progress, debug, N_points = 20):
@@ -98,20 +99,24 @@ class Streamer:
     '''
     Main method.
     Does the following:
-      1) Starts the server socket
-      2) Waits for the analyzer client socket to start a connection
-      3) Reads the specified recording file lines
+      1) Starts the server socket.
+      2) Waits for the analyzer client socket to start a connection.
+      3) Reads the specified recording file lines.
       4) For each line:
-        - Outputs the file exploration progress (like this '=======>......')
-        - Appends it to the buffer
-        - Checks if the buffer is full
-        - If it's full, sends it to the analyzer
+        - Outputs the file exploration progress (like this '=======>......').
+        - Appends it to the buffer.
+        - Checks if the buffer is full.
+        - If it's full, sends it to the analyzer.
       5) Alerts the analyzer when the recording has been totally read.
-      6) Closes the server socket.
+      6) Closes the server socket (a.k.a.: 'dies').
 
     WARNINGS:
-      - Expected format for the recording file is: 'left_value1 right_value1 whatever\n [...] left_valuek right_valuek whatever\n'
-      - Left and right values are separated by a delimiter (' | ') that must then match the one provided to the analyzer parser
+      - Expected format for the recording file is: 
+        'left_value1 right_value1 whatever
+         left_value2 right_value2 whatever
+         ...
+        '
+      - Left and right values are separated by a delimiter (' | ') that must then match the one provided to the analyzer parser.
       - Also make sure that the 'finished' message sent matches the one specified to the analyzer's parser.
 
     Returns:
@@ -142,6 +147,13 @@ class Streamer:
       
 
   def die(self):
+    '''
+    Closes the server socket.
+
+    Returns:
+      Nothing.
+    '''
+
     self.socket.close()
 
 # The file contains 256 recordings/s
