@@ -3,20 +3,57 @@ import time
 import numpy.random as rd
 
 class Analyzer:
+  '''
+  Transforms buffers of samples from a BCI signal into actions served via a socket to the Actioner.
+  '''
   def __init__(self, host = 'localhost', port = 2001, debug = False):
+    '''
+    In:
+      - host (string): The hostname/IP of the analyzer server ('localhost' by default).
+      - port (int): The analyzer server port number (2001 by default).
+      - debug (bool): True means every step will be printed out. False only prints minimal info.
+    WARNING: The host and port specified must match the ones given to the Actioner object when connecting it to the analyzer.
+
+    Returns:
+      The Analyzer object.
+    '''
+
+    # Creates the analyzer server socket
     self.actioner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.actioner_socket.bind((host, port))
+
     self.action = ''
 
+    # Creates the streamer client socket
     self.streamer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     self.buffer = ''
     self.debug = debug
 
   def connect(self, streamer_host = 'localhost', streamer_port = 2000):
+    '''
+    Connects the streamer client socket to the streamer server socket.
+    In:
+      - streamer_host (string): The hostname/IP at which the streamer server is running ('localhost' by default).
+      - streamer_port (int): The port number at which the streamer server is running (2000 by default).
+    WARNING: Those default values match the default values specified in the Streamer class. If you change them, make sure you change the other ones accordingly.
+
+    Returns:
+      Nothing (prints only).
+    '''
+
     self.streamer_socket.connect((streamer_host, streamer_port))
     print('Analyzer connected to streamer')
 
   def wait_for_actioner(self):
+    '''
+    Waits for the actioner to send the 'Actioner ready' message.
+    WARNING: The message specified here must match the one that the actioner is programmed to send.
+
+    Returns:
+      Nothing (prints only).
+    '''
+
     if self.debug:
       print('Waiting for actioner...')
     while True:
@@ -29,14 +66,38 @@ class Analyzer:
         return
 
   def get_buffer_from_streamer(self):
+    '''
+    1) Sends the 'Analyzer ready' flag.
+    2) Receives the buffer from the streamer server socket and then stores it in the local buffer.
+       The transmission starts and ends with delimiter messages from the server.
+    WARNINGS:
+      - The method assumes that the connection with the streamer has already been established (will crash otherwise).
+      - The delimiters must match the ones specified to the streamer in the method responsible for sending the buffer.
+
+    Returns:
+      False: The streamer has read all the data: the connection is over.
+      True: There are still more buffers to come: keep the connection alive.
+    '''
+
+    # Start flag
     start_signal = 'Sending buffer'
+
+    # End flag
     end_signal = 'Buffer sent'
+
+    # Warn streamer that analyzer is ready to receive data
     self.streamer_socket.sendall('Analyzer ready')
+
     if self.debug:
       print('Ready message sent')
+    
+    # Read data until transmission is over
     while True:
       data = self.streamer_socket.recv(1024)
-      # print(data)
+      if self.debug:
+        print(data)
+      
+
       if 'Recording over' in data:
         print('', 'Streaming finished')
         self.die()
@@ -56,21 +117,69 @@ class Analyzer:
           print('Error: {}'.format(self.buffer))
         return True
 
+  # TODO: Do ACTUAL frequency analysis here.
   def compute_action(self):
-    possible_actions = ['TurnRight', 'TurnLeft', 'Forward', 'None']
-    N = len(self.buffer.split(',')) + rd.randint(4)
-    self.buffer = ''
-    self.action = possible_actions[N % 4]
+    '''
+    Inspects the buffer and computes the action to send to the actioner.
+    Empties the buffer afterwards, so it's ready to receive more data.
 
-  def transmit_action(self):
+    Returns:
+      Nothing (prints only).
+    '''
+
+    possible_actions = ['TurnRight', 'TurnLeft', 'Forward', 'None']
+
+    # TO OVERWRITE
+    N = (len(self.buffer.split(',')) + rd.randint(4)) % 4
+
+    self.buffer = ''
+    self.action = possible_actions[N]
+
+  def send_action(self):
+    '''
+    Sends the action to the clients of the analyzer socket and then empties it.
+    The transmission starts and ends with delimiter messages.
+    WARNINGS:
+      - The method assumes that the connection with the actioner has already been established (will crash otherwise).
+      - The delimiters must match the ones specified to the actioner in the method responsible for parsing the action.
+
+    Returns:
+      Nothing (prints only).
+    '''
+
+    # Start flag
     self.client_connection.sendall('Sending actions')
+
     self.client_connection.sendall(self.action)
+
+    # End flag
     self.client_connection.sendall('Actions sent')
+
     if self.debug:
       print('Actions sent')
     self.action = ''
 
   def run(self):
+    '''
+    Main method.
+    Does the following:
+      1) Starts the server socket.
+      2) Waits for the actioner client socket to start a connection.
+      3) Until the connection with the streamer is ended:
+        - Wait until the actioner is ready.
+        - Send the 'Analyzer ready' flag to the streamer.
+        - Receives the buffer from the streamer.
+        - Analyzes it and computes the corresponding action.
+        - Sends it to the actioner.
+      5) Alerts the actioner when the streamer connection is over.
+      6) Closes the server socket (a.k.a.: 'dies').
+
+    WARNING: Make sure that the 'finished' message sent matches the one specified to the actioner's parser.
+
+    Returns:
+      Nothing (prints only)
+    '''
+
     self.actioner_socket.listen(1)
     print('Analyzer listening...')
     conn, addr = self.actioner_socket.accept()
@@ -80,7 +189,7 @@ class Analyzer:
       self.wait_for_actioner()
       if self.get_buffer_from_streamer():
         self.compute_action()
-        self.transmit_action()
+        self.send_action()
       else:
         self.client_connection.sendall('Actions over')
         break
@@ -89,6 +198,13 @@ class Analyzer:
 
 
   def die(self):
+    '''
+    Closes the client (streamer) and the server sockets.
+
+    Returns:
+      Nothing.
+    '''
+
     self.streamer_socket.close()
     self.actioner_socket.close()
 
