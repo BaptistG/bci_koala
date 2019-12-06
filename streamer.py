@@ -61,7 +61,7 @@ class Streamer:
   def send_buffer(self):
     '''
     Sends the buffer to the clients of the streamer socket and then empties it.
-    The connection starts and ends with delimiter messages.
+    The transmission starts and ends with delimiter messages.
     WARNINGS:
       - The method assumes that the connection with the analyzer has already been established (will crash otherwise).
       - The delimiters must match the ones specified to the analyzer in the method responsible for parsing the buffer.
@@ -70,9 +70,14 @@ class Streamer:
       Nothing (prints only).
     '''
 
+    # Start flag
     self.client_connection.sendall('Sending buffer')
+
     self.client_connection.sendall(','.join(self.buffer))
+    
+    # End flag
     self.client_connection.sendall('Buffer sent')
+
     if self.debug:
       print('Buffer sent')
     self.buffer = []
