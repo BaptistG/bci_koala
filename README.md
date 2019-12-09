@@ -11,6 +11,7 @@ Mini projet to valider l'année.
   - Turn right
   - Go forward
   - Do nothing (stop)
+  
 Those signals are direct neural electric signals captured by electrodes on a (bald) man's head.
 Signals are grouped into fixed-length samples and sent to the next layer:
 
