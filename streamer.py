@@ -9,7 +9,7 @@ def print_progress(progress, debug, N_points = 20):
   In:
     - progress (float): The total progress made, between 0 (start) and 1 (end)
     - debug (bool):
-      True means there are outputs that shouldn't be overwritten: the bar is printed in a newline.
+      True means there are outputs that shouldn't be overwritten: prints a percentage in a newline.
       False means there are no other outputs: the bar can be printed inline, using the standard output directly to overwrite itself.
     - N_points (int): The total length of the progress bar string desired.
   
@@ -17,11 +17,11 @@ def print_progress(progress, debug, N_points = 20):
     Nothing (prints only)
   '''
 
-  progress = int(progress * N_points)
-  progress_string = ''.join(['='] * (progress - 1)) + '>' + ''.join(['.'] * (N_points - progress))
   if debug:
-    print(progress_string)
+    print('Progress: {}%'.format(int(progress * 100)))
   else:
+    progress = int(progress * N_points)
+    progress_string = ''.join(['='] * (progress - 1)) + '>' + ''.join(['.'] * (N_points - progress))
     sys.stdout.write(progress_string + "\r")
     sys.stdout.flush()
 
@@ -71,12 +71,12 @@ class Streamer:
     '''
 
     # Start flag
-    self.client_connection.sendall('Sending buffer')
+    self.client_connection.sendall(b'Sending buffer')
 
-    self.client_connection.sendall(','.join(self.buffer))
+    self.client_connection.sendall(','.join(self.buffer).encode('utf-8'))
     
     # End flag
-    self.client_connection.sendall('Buffer sent')
+    self.client_connection.sendall(b'Buffer sent')
 
     if self.debug:
       print('Buffer sent')
@@ -94,7 +94,7 @@ class Streamer:
     if self.debug:
       print('Waiting for analyzer...')
     while True:
-      msg = self.client_connection.recv(1024)
+      msg = self.client_connection.recv(1024).decode('utf-8')
       if 'Analyzer ready' in msg:
         if self.debug:
           print('Ready message received, sending buffer')
@@ -146,8 +146,9 @@ class Streamer:
           print_progress(progress, self.debug)
           self.wait_for_analyzer()
           self.send_buffer()
-      self.client_connection.sendall('Recording over')
-      print('', 'Reading finished')
+      self.wait_for_analyzer()
+      self.client_connection.sendall(b'Recording over')
+      print('\nReading finished')
       self.die()
       
 
@@ -163,8 +164,10 @@ class Streamer:
 
 # The file contains 256 recordings/s
 F_ACQ = 256
-# Analyze samples of length = 1s
-T_ECH = 1 
+# Analyze samples of length = 0.5s
+T_ECH = 0.5
+print('Number of points to consider for analyzer: {}'.format(int(F_ACQ * T_ECH)))
 
-streamer = Streamer(int(F_ACQ * T_ECH))
+# streamer = Streamer(int(F_ACQ * T_ECH))
+streamer = Streamer(3)
 streamer.run()
