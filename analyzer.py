@@ -6,7 +6,7 @@ class Analyzer:
   '''
   Transforms buffers of samples from a BCI signal into actions served via a socket to the Actioner.
   '''
-  def __init__(self, host = 'localhost', port = 2001, buffer_size = 128, debug = False):
+  def __init__(self, host = 'localhost', port = 2001, buffer_size = 128, mode = 'streamer', debug = False):
     '''
     In:
       - host (string): The hostname/IP of the analyzer server ('localhost' by default).
@@ -30,6 +30,8 @@ class Analyzer:
 
     self.buffer = []
     self.buffer_size = buffer_size
+
+    self.mode = mode
     self.debug = debug
 
   def connect(self, streamer_host = 'localhost', streamer_port = 2000):
@@ -70,7 +72,7 @@ class Analyzer:
   def get_buffer_from_streamer(self):
     '''
     1) Sends the 'Analyzer ready' flag.
-    2) Receives the buffer from the streamer server socket and then stores it in the local buffer.
+    2) Receives a buffer from the streamer server socket and then appends it to the local buffer.
        The transmission starts and ends with delimiter messages from the server.
     WARNINGS:
       - The method assumes that the connection with the streamer has already been established (will crash otherwise).
@@ -115,12 +117,16 @@ class Analyzer:
           print('Buffer received')
         try:
           received_buffer = received_buffer.split(start_signal)[-1].split(end_signal)[0]
-          self.buffer += received_buffer.split(',')
+          received_buffer = received_buffer.split(',')
+          self.buffer += [float(value) for value in received_buffer]
         except:
           print('Error: {}'.format(self.buffer))
         return True
 
   # TODO: Do ACTUAL frequency analysis here.
+  def find_frequency(self):
+    pass
+
   def compute_action(self):
     '''
     Inspects the buffer and computes the action to send to the actioner.

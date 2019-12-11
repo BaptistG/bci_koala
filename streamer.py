@@ -121,7 +121,7 @@ class Streamer:
          left_value2 right_value2 whatever
          ...
         '
-      - Left and right values are separated by a delimiter (' | ') that must then match the one provided to the analyzer parser.
+      - Left and right values are averaged.
       - Also make sure that the 'finished' message sent matches the one specified to the analyzer's parser.
 
     Returns:
@@ -139,8 +139,11 @@ class Streamer:
       i = 0.0
       for line in lines:
         i += 1
-        line = ' | '.join(line.split(' ')[:2])
-        self.buffer.append(line)
+
+        values = line.split(' ')[:2]
+        mean_value = (float(values[0]) + float(values[1])) / 2
+        self.buffer.append(str(mean_value))
+
         if self.is_buffer_full():
           progress = i / L
           print_progress(progress, self.debug)
