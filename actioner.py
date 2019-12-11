@@ -21,7 +21,7 @@ class Actioner:
     if self.debug:
       print('Waiting for analyzer')
     while True:
-      data = self.socket.recv(1024)
+      data = self.socket.recv(1024).decode('utf-8')
       if 'Actions over' in data:
         print('', 'Analysis finished')
         self.die()
@@ -31,7 +31,7 @@ class Actioner:
         if self.debug:
           print('Receiving action...')
         while end_signal not in self.actions:
-          data = self.socket.recv(1024)
+          data = self.socket.recv(1024).decode('utf-8')
           self.actions += data
         if self.debug:
           print('Actions received')
@@ -54,7 +54,7 @@ class Actioner:
 
   def run(self):
     while True:
-      self.socket.sendall('Actioner ready')
+      self.socket.sendall(b'Actioner ready')
       if self.debug:
         print('Ready message sent')
       if self.get_actions_from_analyzer():
