@@ -1,6 +1,7 @@
 import socket
 import time
 import numpy.random as rd
+from threading import Thread
 
 class Analyzer:
   '''
@@ -24,15 +25,29 @@ class Analyzer:
     self.actioner_socket.bind((host, port))
 
     self.action = ''
+    self.buffering_thread = Thread()
+
+    self.computing_thread = Thread()
 
     # Creates the streamer client socket
     self.streamer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     self.buffer = []
-    self.buffer_size = buffer_size
 
     self.mode = mode
     self.debug = debug
+
+  def run_buffering_thread():
+    streamer.recv()
+    buffer.append()
+
+  def run_computing_thread():
+    if len(buffer()) > 0:
+      compute_filters()
+      compute_puissances()
+      if time.now() - self.start_time >= 0.25:
+        vote_action()
+        self.start_time = time.now()
 
   def connect(self, streamer_host = 'localhost', streamer_port = 2000):
     '''
@@ -123,10 +138,6 @@ class Analyzer:
           print('Error: {}'.format(self.buffer))
         return True
 
-  # TODO: Do ACTUAL frequency analysis here.
-  def find_frequency(self):
-    pass
-
   def compute_action(self):
     '''
     Inspects the buffer and computes the action to send to the actioner.
@@ -136,13 +147,7 @@ class Analyzer:
       Nothing (prints only).
     '''
 
-    possible_actions = ['TurnRight', 'TurnLeft', 'Forward', 'None']
-
-    # TO OVERWRITE
-    N = (len(self.buffer) + rd.randint(4)) % 4
-
-    self.buffer = []
-    self.action = possible_actions[N]
+    self.buffer.compute_action()
 
   def send_action(self):
     '''
@@ -195,6 +200,7 @@ class Analyzer:
     conn, addr = self.actioner_socket.accept()
     print('Analyzer connected by ', addr)
     self.client_connection = conn
+    start_time = time.start()
     while True:
       self.wait_for_actioner()
       while len(self.buffer) < self.buffer_size:
