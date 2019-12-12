@@ -1,7 +1,10 @@
+from collections import deque
 import socket
 import time
 import numpy.random as rd
 from threading import Thread
+
+from helpers import apply_filter, get_filter_coefs, puissance, vote_action
 
 class Analyzer:
   '''
@@ -34,20 +37,45 @@ class Analyzer:
 
     self.buffer = []
 
+    self.puissances = {
+        7.5: deque([0], 64),
+        11: deque([0], 64),
+        13.5: deque([0], 64)
+    }
+
+    self.filtres = {
+        7.5: deque([0, 0], 2),
+        11: deque([0, 0], 2),
+        13.5: deque([0, 0], 2)
+    }
+
+    self.coefs = get_filter_coefs([7.5, 11, 13.5])
+
     self.mode = mode
     self.debug = debug
 
-  def run_buffering_thread():
+  def run_buffering_thread(self):
     streamer.recv()
     buffer.append()
 
-  def run_computing_thread():
+  def run_computing_thread(self):
     if len(buffer()) > 0:
-      compute_filters()
-      compute_puissances()
-      if time.now() - self.start_time >= 0.25:
-        vote_action()
+        for freq in self.puissances.keys():
+
+            self.filtres[freq].append(apply_filter(value,
+                self.filtres[freq][-1],
+                self.filtres[freq][-2],
+                freq,
+                self.coefs))
+
+            self.puissances[freq].append(puissance(self.filtres[freq][-1],
+                self.puissances[freq][-1]))
+
+    if time.now() - self.start_time >= 0.25:
+        self.action = vote_action(self.puissances)
         self.start_time = time.now()
+        self.send_action()
+
 
   def connect(self, streamer_host = 'localhost', streamer_port = 2000):
     '''
@@ -109,13 +137,13 @@ class Analyzer:
 
     if self.debug:
       print('Ready message sent')
-    
+
     # Read data until transmission is over
     while True:
       data = self.streamer_socket.recv(1024).decode('utf-8')
       if self.debug:
         print(data)
-      
+
       received_buffer = ''
       if 'Recording over' in data:
         print('', 'Streaming finished')
@@ -208,7 +236,9 @@ class Analyzer:
           self.client_connection.sendall(b'Actions over')
           self.die()
           return
-      self.compute_action()
+      while not self.compute_action():
+
+
       self.send_action()
 
 
