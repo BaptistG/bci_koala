@@ -1,6 +1,11 @@
 import socket
 import time
 import turtle
+import serial
+
+ARDUINO_PORT = 'COM7'
+ARDUINO_BAUDRATE = 9600
+ser = serial.Serial(ARDUINO_PORT, ARDUINO_BAUDRATE)
 
 turtle.penup()
 turtle.shape('turtle')
@@ -44,15 +49,27 @@ class Actioner:
   def perform_actions(self):
     if self.actions == 'TurnRight':
       turtle.right(45)
+      ser.write(b'R')
     elif self.actions == 'TurnLeft':
       turtle.left(45)
+      ser.write(b'L')
     elif self.actions == 'Forward':
       turtle.forward(20)
+      ser.write(b'F')
+    elif self.actions == 'None':
+      ser.write(b'N')
     print('I just performed {}'.format(self.actions))
     time.sleep(1)
     self.actions = ''
 
   def run(self):
+    ser.write(b'L')
+    time.sleep(0.25)
+    ser.write(b'F')
+    time.sleep(0.25)
+    ser.write(b'R')
+    time.sleep(0.25)
+    ser.write(b'N')
     while True:
       self.socket.sendall(b'Actioner ready')
       if self.debug:
