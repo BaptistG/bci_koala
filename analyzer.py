@@ -6,113 +6,13 @@ from threading import Thread
 
 from helpers import apply_filter, get_filter_coefs, puissance, vote_action
 
-class Analyzer:
-  '''
-  Transforms buffers of samples from a BCI signal into actions served via a socket to the Actioner.
-  '''
-  def __init__(self, host = 'localhost', port = 2001, buffer_size = 128, mode = 'streamer', debug = False):
-    '''
-    In:
-      - host (string): The hostname/IP of the analyzer server ('localhost' by default).
-      - port (int): The analyzer server port number (2001 by default).
-      - buffer_size (int): The size the buffer must reach before sending the action to the actioner.
-      - debug (bool): True means every step will be printed out. False only prints minimal info.
-    WARNING: The host and port specified must match the ones given to the Actioner object when connecting it to the analyzer.
+class BufferingThread(Thread):
+  def __init__(self, streamer_socket, shared_buffer):
+    super(BufferingThread, self).__init__()
+    self.streamer_socket = streamer_socket
+    self.buffer = shared_buffer
 
-    Returns:
-      The Analyzer object.
-    '''
-
-    # Creates the analyzer server socket
-    self.actioner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.actioner_socket.bind((host, port))
-
-    self.action = ''
-    self.buffering_thread = Thread()
-
-    self.computing_thread = Thread()
-
-    # Creates the streamer client socket
-    self.streamer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    self.buffer = []
-
-    self.puissances = {
-        7.5: deque([0], 64),
-        11: deque([0], 64),
-        13.5: deque([0], 64)
-    }
-
-    self.filtres = {
-        7.5: deque([0, 0], 2),
-        11: deque([0, 0], 2),
-        13.5: deque([0, 0], 2)
-    }
-
-    self.coefs = get_filter_coefs([7.5, 11, 13.5])
-
-    self.mode = mode
-    self.debug = debug
-
-  def run_buffering_thread(self):
-    streamer.recv()
-    buffer.append()
-
-  def run_computing_thread(self):
-    if len(buffer()) > 0:
-        for freq in self.puissances.keys():
-
-            self.filtres[freq].append(apply_filter(value,
-                self.filtres[freq][-1],
-                self.filtres[freq][-2],
-                freq,
-                self.coefs))
-
-            self.puissances[freq].append(puissance(self.filtres[freq][-1],
-                self.puissances[freq][-1]))
-
-    if time.now() - self.start_time >= 0.25:
-        self.action = vote_action(self.puissances)
-        self.start_time = time.now()
-        self.send_action()
-
-
-  def connect(self, streamer_host = 'localhost', streamer_port = 2000):
-    '''
-    Connects the streamer client socket to the streamer server socket.
-    In:
-      - streamer_host (string): The hostname/IP at which the streamer server is running ('localhost' by default).
-      - streamer_port (int): The port number at which the streamer server is running (2000 by default).
-    WARNING: Those default values match the default values specified in the Streamer class. If you change them, make sure you change the other ones accordingly.
-
-    Returns:
-      Nothing (prints only).
-    '''
-
-    self.streamer_socket.connect((streamer_host, streamer_port))
-    print('Analyzer connected to streamer')
-
-  def wait_for_actioner(self):
-    '''
-    Waits for the actioner to send the 'Actioner ready' message.
-    WARNING: The message specified here must match the one that the actioner is programmed to send.
-
-    Returns:
-      Nothing (prints only).
-    '''
-
-    if self.debug:
-      print('Waiting for actioner...')
-    while True:
-      msg = self.client_connection.recv(1024).decode('utf-8')
-      if not msg:
-        return
-      if 'Actioner ready' in msg:
-        if self.debug:
-          print('Ready message received')
-        return
-
-  def get_buffer_from_streamer(self):
+def get_buffer_from_streamer(self):
     '''
     1) Sends the 'Analyzer ready' flag.
     2) Receives a buffer from the streamer server socket and then appends it to the local buffer.
@@ -135,14 +35,9 @@ class Analyzer:
     # Warn streamer that analyzer is ready to receive data
     self.streamer_socket.sendall(b'Analyzer ready')
 
-    if self.debug:
-      print('Ready message sent')
-
     # Read data until transmission is over
     while True:
       data = self.streamer_socket.recv(1024).decode('utf-8')
-      if self.debug:
-        print(data)
 
       received_buffer = ''
       if 'Recording over' in data:
@@ -150,14 +45,11 @@ class Analyzer:
         self.die()
         return False
       if start_signal in data:
-        if self.debug:
-          print('Receiving buffer')
+
         received_buffer += data
         while end_signal not in received_buffer:
           data = self.streamer_socket.recv(1024).decode('utf-8')
           received_buffer += data
-        if self.debug:
-          print('Buffer received')
         try:
           received_buffer = received_buffer.split(start_signal)[-1].split(end_signal)[0]
           received_buffer = received_buffer.split(',')
@@ -166,16 +58,32 @@ class Analyzer:
           print('Error: {}'.format(self.buffer))
         return True
 
-  def compute_action(self):
-    '''
-    Inspects the buffer and computes the action to send to the actioner.
-    Empties the buffer afterwards, so it's ready to receive more data.
+  def run(self):
+    received_buffer = self.get_buffer_from_streamer()
+    self.buffer.append(received_buffer)
 
-    Returns:
-      Nothing (prints only).
-    '''
+class ComputingThread(Thread):
+  def __init__(self, client_connection, shared_buffer):
+    super(ComputingThread, self).__init__()
 
-    self.buffer.compute_action()
+    self.last_start_time = time.now()
+    self.buffer = shared_buffer
+    self.puissances = {
+        7.5: deque([0], 64),
+        11: deque([0], 64),
+        13.5: deque([0], 64)
+    }
+
+    self.filtres = {
+        7.5: deque([0, 0], 2),
+        11: deque([0, 0], 2),
+        13.5: deque([0, 0], 2)
+    }
+
+    self.coefs = get_filter_coefs([7.5, 11, 13.5])
+
+    self.client_connection = client_connection
+    self.action = 'None'
 
   def send_action(self):
     '''
@@ -197,9 +105,92 @@ class Analyzer:
     # End flag
     self.client_connection.sendall(b'Actions sent')
 
-    if self.debug:
-      print('Actions sent')
-    self.action = ''
+    self.action = 'None'
+
+  def compute(self):
+    if self.buffer:
+      for freq in self.puissances.keys():
+
+        self.filtres[freq].append(apply_filter(value,
+          self.filtres[freq][-1],
+          self.filtres[freq][-2],
+          freq,
+          self.coefs))
+
+        self.puissances[freq].append(puissance(self.filtres[freq][-1],
+          self.puissances[freq][-1]))
+
+    if time.now() - self.last_start_time >= 0.25:
+      self.action = vote_action(self.puissances)
+      self.wait_for_actioner()
+      self.send_action()
+      self.last_start_time = time.now()
+
+  def wait_for_actioner(self):
+    '''
+    Waits for the actioner to send the 'Actioner ready' message.
+    WARNING: The message specified here must match the one that the actioner is programmed to send.
+
+    Returns:
+      Nothing (prints only).
+    '''
+
+    while True:
+      msg = self.client_connection.recv(1024).decode('utf-8')
+      if not msg:
+        return
+      if 'Actioner ready' in msg:
+        return
+
+  def run(self):
+    self.compute()
+
+class Analyzer:
+  '''
+  Transforms buffers of samples from a BCI signal into actions served via a socket to the Actioner.
+  '''
+  def __init__(self, host = 'localhost', port = 2001, buffer_size = 64, mode = 'streamer', debug = False):
+    '''
+    In:
+      - host (string): The hostname/IP of the analyzer server ('localhost' by default).
+      - port (int): The analyzer server port number (2001 by default).
+      - buffer_size (int): The size the buffer must reach before sending the action to the actioner.
+      - debug (bool): True means every step will be printed out. False only prints minimal info.
+    WARNING: The host and port specified must match the ones given to the Actioner object when connecting it to the analyzer.
+
+    Returns:
+      The Analyzer object.
+    '''
+
+    # Creates the analyzer server socket
+    self.actioner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.actioner_socket.bind((host, port))
+
+    # Creates the streamer client socket
+    self.streamer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    self.shared_buffer = deque([], buffer_size)
+
+    self.mode = mode
+    self.debug = debug
+
+    self.buffering_thread = BufferingThread(self.streamer_socket, self.shared_buffer)
+
+  def connect(self, streamer_host = 'localhost', streamer_port = 2000):
+    '''
+    Connects the streamer client socket to the streamer server socket.
+    In:
+      - streamer_host (string): The hostname/IP at which the streamer server is running ('localhost' by default).
+      - streamer_port (int): The port number at which the streamer server is running (2000 by default).
+    WARNING: Those default values match the default values specified in the Streamer class. If you change them, make sure you change the other ones accordingly.
+
+    Returns:
+      Nothing (prints only).
+    '''
+
+    self.streamer_socket.connect((streamer_host, streamer_port))
+    print('Analyzer connected to streamer')
+
 
   def run(self):
     '''
@@ -228,18 +219,11 @@ class Analyzer:
     conn, addr = self.actioner_socket.accept()
     print('Analyzer connected by ', addr)
     self.client_connection = conn
-    start_time = time.start()
-    while True:
-      self.wait_for_actioner()
-      while len(self.buffer) < self.buffer_size:
-        if not self.get_buffer_from_streamer():
-          self.client_connection.sendall(b'Actions over')
-          self.die()
-          return
-      while not self.compute_action():
+    
+    self.computing_thread = ComputingThread(self.client_connection, self.shared_buffer)
 
-
-      self.send_action()
+    self.buffering_thread.start()
+    self.computing_thread.start()
 
 
   def die(self):
