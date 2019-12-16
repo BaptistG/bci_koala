@@ -59,7 +59,6 @@ class Actioner:
     elif self.actions == 'None':
       ser.write(b'N')
     print('I just performed {}'.format(self.actions))
-    time.sleep(1)
     self.actions = ''
 
   def run(self):
@@ -70,6 +69,8 @@ class Actioner:
     ser.write(b'R')
     time.sleep(0.25)
     ser.write(b'N')
+
+    self.connect()
     while True:
       self.socket.sendall(b'Actioner ready')
       if self.debug:

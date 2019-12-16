@@ -2,6 +2,7 @@
 
 import socket
 import sys
+import time
 
 def print_progress(progress, debug, N_points = 20):
   '''
@@ -71,6 +72,7 @@ class Streamer:
     '''
 
     # Start flag
+    print('Sending buffer')
     self.client_connection.sendall(b'Sending buffer')
 
     self.client_connection.sendall(','.join(self.buffer).encode('utf-8'))
@@ -133,12 +135,13 @@ class Streamer:
     conn, addr = self.socket.accept()
     print('Streamer connected by ', addr)
     self.client_connection = conn
-    with open('./recording.txt', 'r') as recording:
+    with open('./enonce/acquisition_biosemi/Enregistrements/herve002.txt', 'r') as recording:
       lines = recording.readlines()
       L = len(lines)
       i = 0.0
       for line in lines:
         i += 1
+        time.sleep(1 / 256)
 
         values = line.split(' ')[:2]
         mean_value = (float(values[0]) + float(values[1])) / 2
@@ -167,8 +170,8 @@ class Streamer:
 
 # The file contains 256 recordings/s
 F_ACQ = 256
-# Analyze samples of length = 0.5s
-T_ECH = 0.5
+# Analyze samples of length = 0.25s
+T_ECH = 0.25
 print('Number of points to consider for analyzer: {}'.format(int(F_ACQ * T_ECH)))
 
 # streamer = Streamer(int(F_ACQ * T_ECH))
