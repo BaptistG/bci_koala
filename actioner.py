@@ -49,10 +49,10 @@ class Actioner:
     elif self.actions == 'Forward':
       turtle.forward(20)
     print('I just performed {}'.format(self.actions))
-    time.sleep(1)
     self.actions = ''
 
   def run(self):
+    self.connect()
     while True:
       self.socket.sendall(b'Actioner ready')
       if self.debug:

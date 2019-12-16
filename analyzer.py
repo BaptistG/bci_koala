@@ -4,15 +4,16 @@ import time
 import numpy.random as rd
 from threading import Thread
 
-from helpers import apply_filter, get_filter_coefs, puissance, vote_action
+from helpers import apply_filter, get_filter_coefs, puissance, votes
 
 class BufferingThread(Thread):
-  def __init__(self, streamer_socket, shared_buffer):
+  def __init__(self, streamer_socket, shared_buffer, terminator_signal):
     super(BufferingThread, self).__init__()
     self.streamer_socket = streamer_socket
     self.buffer = shared_buffer
+    self.terminator_signal = terminator_signal
 
-def get_buffer_from_streamer(self):
+  def get_buffer_from_streamer(self):
     '''
     1) Sends the 'Analyzer ready' flag.
     2) Receives a buffer from the streamer server socket and then appends it to the local buffer.
@@ -42,7 +43,7 @@ def get_buffer_from_streamer(self):
       received_buffer = ''
       if 'Recording over' in data:
         print('', 'Streaming finished')
-        self.die()
+        self.terminator_signal = True
         return False
       if start_signal in data:
 
@@ -53,21 +54,22 @@ def get_buffer_from_streamer(self):
         try:
           received_buffer = received_buffer.split(start_signal)[-1].split(end_signal)[0]
           received_buffer = received_buffer.split(',')
-          self.buffer += [float(value) for value in received_buffer]
+          self.buffer.extend([float(value) for value in received_buffer])
         except:
           print('Error: {}'.format(self.buffer))
         return True
 
   def run(self):
-    received_buffer = self.get_buffer_from_streamer()
-    self.buffer.append(received_buffer)
+    while not self.terminator_signal:
+      self.get_buffer_from_streamer()
 
 class ComputingThread(Thread):
-  def __init__(self, client_connection, shared_buffer):
+  def __init__(self, client_connection, shared_buffer, terminator_signal):
     super(ComputingThread, self).__init__()
 
-    self.last_start_time = time.now()
+    self.last_start_time = time.time()
     self.buffer = shared_buffer
+    self.computed_points = 0
     self.puissances = {
         7.5: deque([0], 64),
         11: deque([0], 64),
@@ -84,6 +86,8 @@ class ComputingThread(Thread):
 
     self.client_connection = client_connection
     self.action = 'None'
+    self.terminator_signal = terminator_signal
+
 
   def send_action(self):
     '''
@@ -108,23 +112,29 @@ class ComputingThread(Thread):
     self.action = 'None'
 
   def compute(self):
-    if self.buffer:
-      for freq in self.puissances.keys():
 
-        self.filtres[freq].append(apply_filter(value,
-          self.filtres[freq][-1],
-          self.filtres[freq][-2],
-          freq,
-          self.coefs))
+    if not self.buffer:
+      return
 
-        self.puissances[freq].append(puissance(self.filtres[freq][-1],
-          self.puissances[freq][-1]))
+    value = self.buffer.popleft()
+    for freq in self.puissances.keys():
 
-    if time.now() - self.last_start_time >= 0.25:
-      self.action = vote_action(self.puissances)
+      self.filtres[freq].append(apply_filter(value,
+        self.filtres[freq][-1],
+        self.filtres[freq][-2],
+        freq,
+        self.coefs))
+
+      self.puissances[freq].append(puissance(self.filtres[freq][-1],
+        self.puissances[freq][-1]))
+    self.computed_points += 1
+
+    if self.computed_points == 64:
+      self.computed_points = 0
+      self.action = votes(self.puissances)
       self.wait_for_actioner()
       self.send_action()
-      self.last_start_time = time.now()
+      self.last_start_time = time.time()
 
   def wait_for_actioner(self):
     '''
@@ -143,7 +153,8 @@ class ComputingThread(Thread):
         return
 
   def run(self):
-    self.compute()
+    while not self.terminator_signal:
+      self.compute()
 
 class Analyzer:
   '''
@@ -173,8 +184,9 @@ class Analyzer:
 
     self.mode = mode
     self.debug = debug
+    self.terminator_signal = False
 
-    self.buffering_thread = BufferingThread(self.streamer_socket, self.shared_buffer)
+    self.buffering_thread = BufferingThread(self.streamer_socket, self.shared_buffer, self.terminator_signal)
 
   def connect(self, streamer_host = 'localhost', streamer_port = 2000):
     '''
@@ -220,7 +232,7 @@ class Analyzer:
     print('Analyzer connected by ', addr)
     self.client_connection = conn
     
-    self.computing_thread = ComputingThread(self.client_connection, self.shared_buffer)
+    self.computing_thread = ComputingThread(self.client_connection, self.shared_buffer, self.terminator_signal)
 
     self.buffering_thread.start()
     self.computing_thread.start()
@@ -236,5 +248,7 @@ class Analyzer:
 
     self.streamer_socket.close()
     self.actioner_socket.close()
+    self.buffering_thread.join()
+    self.computing_thread.join()
 
-analyzer = Analyzer(buffer_size = 128)
+analyzer = Analyzer(buffer_size = 64)

@@ -39,7 +39,8 @@ def votes(puissances):
     v_droite = 0
     v_none = 0
 
-    for i in range(64):
+    N = len(gauche)
+    for i in range(N):
         if max(gauche[i], avance[i], droite[i]) < 0.0025:
                 v_none += 1
         elif gauche[i] > avance[i] and gauche[i] > droite[i]:
