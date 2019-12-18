@@ -72,7 +72,8 @@ class Streamer:
     '''
 
     # Start flag
-    print('Sending buffer')
+    if self.debug:
+      print('Sending buffer')
     self.client_connection.sendall(b'Sending buffer')
 
     self.client_connection.sendall(','.join(self.buffer).encode('utf-8'))
@@ -135,7 +136,9 @@ class Streamer:
     conn, addr = self.socket.accept()
     print('Streamer connected by ', addr)
     self.client_connection = conn
-    with open('./enonce/acquisition_biosemi/Enregistrements/herve002.txt', 'r') as recording:
+
+    filepath = './enonce/acquisition_biosemi/Enregistrements/herve002.txt'
+    with open(filepath, 'r') as recording:
       lines = recording.readlines()
       L = len(lines)
       i = 0.0
