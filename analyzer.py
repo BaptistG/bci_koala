@@ -4,7 +4,7 @@ import time
 import numpy.random as rd
 from threading import Thread
 
-from helpers import apply_filter, get_filter_coefs, puissance, votes
+from utils.helpers import apply_filter, get_filter_coefs, puissance, votes
 
 class BufferingThread(Thread):
   def __init__(self, streamer_socket, shared_buffer, terminator_signal):
@@ -62,6 +62,8 @@ class BufferingThread(Thread):
   def run(self):
     while not self.terminator_signal:
       self.get_buffer_from_streamer()
+    print('Buffering ended')
+    return
 
 class ComputingThread(Thread):
   def __init__(self, client_connection, shared_buffer, terminator_signal):
@@ -155,6 +157,8 @@ class ComputingThread(Thread):
   def run(self):
     while not self.terminator_signal:
       self.compute()
+    print('Computing ended')
+    return
 
 class Analyzer:
   '''
@@ -237,6 +241,11 @@ class Analyzer:
     self.buffering_thread.start()
     self.computing_thread.start()
 
+    self.buffering_thread.join()
+    self.computing_thread.join()
+    self.streamer_socket.close()
+    self.actioner_socket.close()
+
 
   def die(self):
     '''
@@ -248,7 +257,5 @@ class Analyzer:
 
     self.streamer_socket.close()
     self.actioner_socket.close()
-    self.buffering_thread.join()
-    self.computing_thread.join()
 
 analyzer = Analyzer(buffer_size = 64)

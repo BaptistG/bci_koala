@@ -30,10 +30,11 @@ class Streamer:
   '''
   Transforms a complete recording (.txt) into a 'Stream', a flow of small buffers served via a socket to the Analyzer.
   '''
-  def __init__(self, buffer_size, host = 'localhost', port = 2000, debug = False):
+  def __init__(self, buffer_size, filepath, host = 'localhost', port = 2000, debug = False):
     '''
     In:
       - buffer_size (int): The size of the buffers (list) to be sent.
+      - filepath (string): The recording file's path.
       - host (string): The hostname/IP of the streaming server ('localhost' by default).
       - port (int): The streaming server port number (2000 by default).
       - debug (bool): True means every step will be printed out. False only prints minimal info.
@@ -47,6 +48,7 @@ class Streamer:
     self.socket.bind((host, port))
     self.buffer = []
     self.buffer_size = buffer_size
+    self.filepath = filepath
     self.debug = debug
 
   def is_buffer_full(self):
@@ -72,7 +74,8 @@ class Streamer:
     '''
 
     # Start flag
-    print('Sending buffer')
+    if self.debug:
+      print('Sending buffer')
     self.client_connection.sendall(b'Sending buffer')
 
     self.client_connection.sendall(','.join(self.buffer).encode('utf-8'))
@@ -135,7 +138,8 @@ class Streamer:
     conn, addr = self.socket.accept()
     print('Streamer connected by ', addr)
     self.client_connection = conn
-    with open('./enonce/acquisition_biosemi/Enregistrements/herve002.txt', 'r') as recording:
+
+    with open(self.filepath, 'r') as recording:
       lines = recording.readlines()
       L = len(lines)
       i = 0.0
@@ -168,12 +172,13 @@ class Streamer:
 
     self.socket.close()
 
+filepath = './recordings/herve002.txt'
+
 # The file contains 256 recordings/s
 F_ACQ = 256
-# Analyze samples of length = 0.25s
+# We want 1 action every 0.25s
 T_ECH = 0.25
 print('Number of points to consider for analyzer: {}'.format(int(F_ACQ * T_ECH)))
 
-# streamer = Streamer(int(F_ACQ * T_ECH))
-streamer = Streamer(3)
+streamer = Streamer(3, filepath)
 streamer.run()
