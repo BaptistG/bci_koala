@@ -4,7 +4,7 @@ import time
 import numpy.random as rd
 from threading import Thread
 
-from helpers import apply_filter, get_filter_coefs, puissance, votes
+from utils.helpers import apply_filter, get_filter_coefs, puissance, votes
 
 class BufferingThread(Thread):
   def __init__(self, streamer_socket, shared_buffer, terminator_signal):

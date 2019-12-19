@@ -3,7 +3,7 @@ import time
 import turtle
 import serial
 
-from better_turtle import register_koala 
+from utils.better_turtle import register_koala 
 
 ARDUINO_PORT = 'COM7'
 ARDUINO_BAUDRATE = 9600
