@@ -43,7 +43,7 @@ class BufferingThread(Thread):
       received_buffer = ''
       if 'Recording over' in data:
         print('', 'Streaming finished')
-        self.terminator_signal = True
+        self.terminator_signal[0] = True
         return False
       if start_signal in data:
 
@@ -60,7 +60,7 @@ class BufferingThread(Thread):
         return True
 
   def run(self):
-    while not self.terminator_signal:
+    while not self.terminator_signal[0]:
       self.get_buffer_from_streamer()
     return
 
@@ -102,10 +102,6 @@ class ComputingThread(Thread):
       Nothing (prints only).
     '''
 
-    if self.terminator_signal:
-      self.client_connection.sendall(b'Actions over')
-      return
-
     # Start flag
     self.client_connection.sendall(b'Sending actions')
 
@@ -117,7 +113,6 @@ class ComputingThread(Thread):
     self.action = 'None'
 
   def compute(self):
-
     if not self.buffer:
       return
 
@@ -150,7 +145,7 @@ class ComputingThread(Thread):
       Nothing (prints only).
     '''
 
-    while not self.terminator_signal:
+    while not self.terminator_signal[0]:
       msg = self.client_connection.recv(1024).decode('utf-8')
       if not msg:
         return
@@ -158,8 +153,9 @@ class ComputingThread(Thread):
         return
 
   def run(self):
-    while not self.terminator_signal:
+    while not self.terminator_signal[0]:
       self.compute()
+    self.client_connection.sendall(b'Actions over')
     return
 
 class Analyzer:
@@ -190,7 +186,9 @@ class Analyzer:
 
     self.mode = mode
     self.debug = debug
-    self.terminator_signal = False
+
+    # Use an array, so that it's shared
+    self.terminator_signal = [False]
 
     self.buffering_thread = BufferingThread(self.streamer_socket, self.shared_buffer, self.terminator_signal)
 
@@ -245,7 +243,7 @@ class Analyzer:
 
     self.buffering_thread.join()
     self.computing_thread.join()
-    
+
     self.die()
 
 
