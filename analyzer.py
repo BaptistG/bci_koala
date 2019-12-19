@@ -62,7 +62,6 @@ class BufferingThread(Thread):
   def run(self):
     while not self.terminator_signal:
       self.get_buffer_from_streamer()
-    print('Buffering ended')
     return
 
 class ComputingThread(Thread):
@@ -102,6 +101,10 @@ class ComputingThread(Thread):
     Returns:
       Nothing (prints only).
     '''
+
+    if self.terminator_signal:
+      self.client_connection.sendall(b'Actions over')
+      return
 
     # Start flag
     self.client_connection.sendall(b'Sending actions')
@@ -147,7 +150,7 @@ class ComputingThread(Thread):
       Nothing (prints only).
     '''
 
-    while True:
+    while not self.terminator_signal:
       msg = self.client_connection.recv(1024).decode('utf-8')
       if not msg:
         return
@@ -157,7 +160,6 @@ class ComputingThread(Thread):
   def run(self):
     while not self.terminator_signal:
       self.compute()
-    print('Computing ended')
     return
 
 class Analyzer:
@@ -243,8 +245,8 @@ class Analyzer:
 
     self.buffering_thread.join()
     self.computing_thread.join()
-    self.streamer_socket.close()
-    self.actioner_socket.close()
+    
+    self.die()
 
 
   def die(self):
