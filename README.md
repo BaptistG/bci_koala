@@ -26,7 +26,7 @@ The robot is given an **order** and must then execute it. For now, we'll do with
 ## Dependencies/requirements
 
 This project was made using Python 3.6: please make sure to install the interpreter before running the code.
-Only one non-standard library was used: to install it, simply run `pip install -r ./requirements.txt` from the source folder.
+3 non-standard libraries were used: to install them, simply run `pip install -r ./requirements.txt` from the source folder.
 
 You are given 2 options for running the code: either on a single machine or on different ones. In the latter case, please be sure to specify the right IP addresses of your machines when interconnecting the different components (`localhost` by default).
 
