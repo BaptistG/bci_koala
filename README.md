@@ -50,13 +50,15 @@ It uses functions from `helpers.py`, located in the *utils* folder.
 4) `analyzer.run()`
 
 ### The Actioner
-`actioner.py` parses the actions received from the *Analyzer* and executes them. So far it uses **turtle** to mock the robot and sends serial communications to an Arduino board.
+`actioner.py` parses the actions received from the *Analyzer* and executes them. So far it uses **turtle** to mock the robot and sends serial communications to an **Arduino** board.
 
 *How to start:*
 1) Start the *Analyzer*
 2) `python -i actioner.py`
 3) `actioner.connect()`
 4) `actioner.run()`
+
+## Bonuses
 
 ### Docstring
 Docstring is available for those 3 modules, just use `help(ClassName)` to get info on any of those classes (doc coming soon).
