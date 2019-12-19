@@ -60,3 +60,9 @@ It uses functions from `helpers.py`, located in the *utils* folder.
 
 ### Docstring
 Docstring is available for those 3 modules, just use `help(ClassName)` to get info on any of those classes (doc coming soon).
+
+### Arduino
+The Actioner sends signals over a specified Serial USB port (`COM7` by default) at a certain BaudRate (`9600`by default), expecting to reach an **Arduino** board programmed to read those signals.
+Such a code is provided in the *arduino* folder: this code can be televersed on an **Arduino Uno** board using the **Arduino IDE** and matching the following schematics for pin-outs:
+
+![alt text](./images/arduino_schematics.png "Arduino schematics")
